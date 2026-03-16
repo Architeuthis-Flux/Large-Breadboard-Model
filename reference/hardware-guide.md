@@ -66,7 +66,7 @@ The host helper script (`scripts/jumperless.py`) uses these patterns plus probin
 The CH446Q crossbar fabric introduces a non‑negligible series resistance:
 
 - **Per path:** approximately 80 Ω for a single routing path
-- **Stacked paths:** firmware can route multiple parallel paths between nodes (`[routing] stack_paths`, etc.), reducing effective resistance to ~20 Ω in heavily used connections
+- **Stacked paths:** firmware will route multiple parallel paths between nodes (`[routing] stack_paths`, etc.) by default, reducing effective resistance to ~30 Ω in connections that need to carry current
 
 Implications:
 

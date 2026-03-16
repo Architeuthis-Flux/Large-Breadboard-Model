@@ -10,11 +10,10 @@ This script is designed to be called by an agent via shell.
 """
 
 import argparse
-import json
 import os
 import sys
 import time
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 try:
     import serial  # type: ignore
@@ -202,7 +201,29 @@ def _read_exact(ser: serial.Serial, n: int, timeout: float = 5.0) -> bytes:
     return buf
 
 
-def raw_exec(ser: serial.Serial, code: str, timeout: float = 5.0) -> Tuple[str, str]:
+def _read_raw_block(ser: serial.Serial, timeout: float = 5.0) -> bytes:
+    """Read one raw-REPL output block terminated by Ctrl-D."""
+    end_time = time.time() + timeout
+    buf = b""
+    while time.time() < end_time:
+        bch = ser.read(1)
+        if not bch:
+            time.sleep(0.01)
+            continue
+        if bch == b"\x04":
+            return buf
+        buf += bch
+    raise TimeoutError("Timed out waiting for raw REPL block terminator")
+
+
+def _normalize_code(code: str) -> str:
+    normalized = code.replace("\r\n", "\n").replace("\r", "\n")
+    if not normalized.endswith("\n"):
+        normalized += "\n"
+    return normalized
+
+
+def raw_exec(ser: serial.Serial, code: str, timeout: float = 8.0) -> Tuple[str, str]:
     """
     Execute code in raw REPL and return (stdout, stderr) as strings.
     Mirrors the logic in JumperIDE's rawmode.js:
@@ -212,46 +233,110 @@ def raw_exec(ser: serial.Serial, code: str, timeout: float = 5.0) -> Tuple[str, 
       - read stdout until Ctrl-D
       - read stderr until Ctrl-D
     """
-    # Consume any '>' prompt if present
+    # Consume any pending prompt bytes before sending payload
     ser.write(b"\r")
     ser.flush()
     time.sleep(0.05)
     ser.reset_input_buffer()
 
-    ser.write(code.encode("utf-8") + b"\x04")
+    payload = _normalize_code(code).encode("utf-8")
+    ser.write(payload + b"\x04")
     ser.flush()
 
     status = _read_exact(ser, 2, timeout=timeout)
-    if status != b"OK":
-        # Some firmwares send a short error token; treat anything non-OK as error
-        # The error text will come in the stderr block below.
-        pass
+    if len(status) < 2:
+        raise TimeoutError("Timed out waiting for raw REPL status bytes")
 
-    # Read stdout
-    out = b""
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        bch = ser.read(1)
-        if not bch:
-            time.sleep(0.01)
-            continue
-        if bch == b"\x04":
-            break
-        out += bch
+    out = _read_raw_block(ser, timeout=timeout)
+    err = _read_raw_block(ser, timeout=timeout)
 
-    # Read stderr
-    err = b""
-    end_time = time.time() + timeout
-    while time.time() < end_time:
-        bch = ser.read(1)
-        if not bch:
-            time.sleep(0.01)
-            continue
-        if bch == b"\x04":
-            break
-        err += bch
+    out_text = out.decode("utf-8", errors="ignore")
+    err_text = err.decode("utf-8", errors="ignore")
+    if status != b"OK" and not err_text.strip():
+        err_text = "Device returned non-OK raw REPL status (possible syntax error)."
+    return out_text, err_text
 
-    return out.decode("utf-8", errors="ignore"), err.decode("utf-8", errors="ignore")
+
+def _load_exec_code(args: argparse.Namespace) -> str:
+    if args.file:
+        with open(args.file, "r", encoding="utf-8") as f:
+            return f.read()
+    if args.stdin:
+        return sys.stdin.read()
+    if args.code is not None:
+        return args.code
+    raise SystemExit("No code provided. Use positional CODE, --file, or --stdin.")
+
+
+def _read_step_lines(path: str) -> List[str]:
+    """
+    Read step lines for guided mode.
+    - Each non-empty line is a step.
+    - Lines starting with '#' are ignored.
+    """
+    steps: List[str] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+            steps.append(line)
+    if not steps:
+        raise SystemExit("Guide file has no runnable steps. Add one step per non-empty line.")
+    return steps
+
+
+def _build_guide_script(steps: List[str], oled: bool = True) -> str:
+    lines = [
+        "def _jl_wait_for_continue():",
+        "    # Prefer probe button (blocking). Fallback to clickwheel button polling.",
+        "    try:",
+        "        probe_button(True)",
+        "        return",
+        "    except Exception:",
+        "        pass",
+        "    try:",
+        "        while True:",
+        "            try:",
+        "                if clickwheel_get_button():",
+        "                    break",
+        "            except Exception:",
+        "                pass",
+        "            sleep_ms(40)",
+        "        # Debounce / wait for release if API supports it",
+        "        for _ in range(25):",
+        "            try:",
+        "                if not clickwheel_get_button():",
+        "                    break",
+        "            except Exception:",
+        "                break",
+        "            sleep_ms(20)",
+        "    except Exception:",
+        "        # Last resort: don't block forever if no button API exists",
+        "        sleep_ms(800)",
+        "",
+        f"_jl_steps = [{', '.join([repr(s) for s in steps])}]",
+        "for _jl_i, _jl_msg in enumerate(_jl_steps):",
+        "    _jl_header = 'STEP {}/{}: '.format(_jl_i + 1, len(_jl_steps))",
+        "    print(_jl_header + _jl_msg)",
+    ]
+    if oled:
+        lines.extend(
+            [
+                "    try:",
+                "        oled_clear()",
+                "        oled_print(_jl_header + _jl_msg)",
+                "    except Exception:",
+                "        pass",
+            ]
+        )
+    lines.extend(
+        [
+            "    _jl_wait_for_continue()",
+            "print('Guide complete')",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 def cmd_detect(args: argparse.Namespace) -> None:
@@ -264,14 +349,40 @@ def cmd_exec(args: argparse.Namespace) -> None:
     with serial.Serial(port, 115200, timeout=1) as ser:
         enter_raw_repl(ser, soft_reboot=args.soft_reboot)
         try:
-            code = args.code
-            out, err = raw_exec(ser, code, timeout=args.timeout)
+            code = _load_exec_code(args)
+            try:
+                out, err = raw_exec(ser, code, timeout=args.timeout)
+            except TimeoutError as exc:
+                print(f"Execution timed out: {exc}", file=sys.stderr)
+                print("Tip: run multi-line scripts with --file to avoid malformed shell quoting.", file=sys.stderr)
+                sys.exit(1)
         finally:
             exit_raw_repl(ser)
         if err:
             # Print stderr to stderr so the agent can distinguish
             print(err, file=sys.stderr)
             # Non-zero exit to signal failure
+            sys.exit(1)
+        if out:
+            print(out, end="" if out.endswith("\n") else "\n")
+
+
+def cmd_guide(args: argparse.Namespace) -> None:
+    steps = _read_step_lines(args.file)
+    code = _build_guide_script(steps, oled=not args.no_oled)
+    port = detect_port(explicit=args.port)
+    with serial.Serial(port, 115200, timeout=1) as ser:
+        enter_raw_repl(ser, soft_reboot=False)
+        try:
+            try:
+                out, err = raw_exec(ser, code, timeout=args.timeout)
+            except TimeoutError as exc:
+                print(f"Guide timed out: {exc}", file=sys.stderr)
+                sys.exit(1)
+        finally:
+            exit_raw_repl(ser)
+        if err:
+            print(err, file=sys.stderr)
             sys.exit(1)
         if out:
             print(out, end="" if out.endswith("\n") else "\n")
@@ -338,11 +449,19 @@ def main() -> None:
     p_detect = sub.add_parser("detect", help="Detect and print the Jumperless MicroPython REPL port")
     p_detect.set_defaults(func=cmd_detect)
 
-    p_exec = sub.add_parser("exec", help="Execute a MicroPython snippet via raw REPL")
-    p_exec.add_argument("code", help="Python code to execute on the device")
+    p_exec = sub.add_parser("exec", help="Execute MicroPython via raw REPL")
+    p_exec.add_argument("code", nargs="?", default=None, help="Inline Python code to execute on device")
+    p_exec.add_argument("--file", help="Read Python code from file", default=None)
+    p_exec.add_argument("--stdin", action="store_true", help="Read Python code from stdin")
     p_exec.add_argument("--soft-reboot", action="store_true", help="Soft reboot into raw REPL before executing")
-    p_exec.add_argument("--timeout", type=float, default=5.0, help="Timeout in seconds for command execution")
+    p_exec.add_argument("--timeout", type=float, default=8.0, help="Timeout in seconds for command execution")
     p_exec.set_defaults(func=cmd_exec)
+
+    p_guide = sub.add_parser("guide", help="Run step-by-step guided instructions with button-gated continue")
+    p_guide.add_argument("--file", required=True, help="Text file with one step per line")
+    p_guide.add_argument("--no-oled", action="store_true", help="Do not render step text on OLED")
+    p_guide.add_argument("--timeout", type=float, default=120.0, help="Timeout in seconds for guide execution")
+    p_guide.set_defaults(func=cmd_guide)
 
     p_state = sub.add_parser("state", help="Print get_state() JSON from the device")
     p_state.add_argument("--timeout", type=float, default=5.0, help="Timeout in seconds for command execution")

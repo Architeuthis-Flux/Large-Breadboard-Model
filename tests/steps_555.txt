@@ -1,0 +1,11 @@
+# One step per line. The guide runner prints/OLEDs each step and waits for probe button.
+Place the NE555 across the breadboard center gap with the notch up.
+Connect pin 1 to GND.
+Connect pin 8 to TOP_RAIL (set near 3V to 5V as needed).
+Connect pin 4 (RESET) to pin 8 (VCC).
+Connect pin 2 to pin 6.
+Connect R1 between pin 8 and pin 7.
+Connect R2 between pin 7 and pin 2.
+Connect capacitor C between pin 2 and GND.
+Connect pin 3 to LED anode path; LED cathode to GND through resistor.
+Press the button after each check; final step confirms wiring complete.

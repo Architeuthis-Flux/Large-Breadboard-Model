@@ -1,261 +1,145 @@
 ---
 name: jumperless-v5
 description: >-
-  Control a Jumperless V5 breadboard for hardware-in-the-loop circuit prototyping
-  and debugging. Connect/disconnect nodes, take voltage/current measurements, control
-  DACs/GPIOs, display overlays on breadboard LEDs, and interact with the MicroPython
-  REPL. Use when the user mentions Jumperless, breadboard wiring, circuit testing,
-  hardware debugging, or measuring voltage/current/resistance on real hardware.
+  Operates a Jumperless V5 breadboard for hardware-in-the-loop prototyping and
+  debugging. Uses MicroPython REPL to route connections, set rails/DACs, perform
+  measurements, control GPIO/OLED/LED overlays, and run guided test scripts. Use
+  when the user mentions Jumperless, breadboard wiring, circuit testing, hardware
+  debugging, or voltage/current/resistance measurements on physical hardware.
 ---
 
 # Jumperless V5 Skill
 
-## What this skill does
+This skill controls real Jumperless hardware via MicroPython REPL.
 
-This skill teaches the agent how to use a **Jumperless V5** smart breadboard as a hardware extension: it can create and remove virtual jumpers, set power rails and DACs, read ADCs and current sensors, drive GPIOs, and render graphics on the 128×32 OLED and the RGB LEDs under every hole. All control happens through the **MicroPython REPL** running on the `JL Micropython REPL` USB CDC endpoint, using the `jumperless` module APIs that are already available in the global namespace.
+## Jumperless At A Glance
 
-Use this skill whenever the user wants to:
-- Prototype or debug a circuit on a breadboard using real hardware
-- Measure voltages, currents, or resistances on a physical circuit
-- Guide a user step‑by‑step in wiring components on a Jumperless board
-- Visualize instructions or circuit states using breadboard LED overlays
+Jumperless V5 is a smart breadboard that can:
 
-When unsure about a low‑level detail, prefer to **look it up** in the reference files instead of guessing.
+- Virtually wire nodes (`connect`, `disconnect`) without moving jumpers.
+- Measure voltages/currents using onboard ADC/INA paths.
+- Set rails/DACs, drive GPIO/PWM, and render OLED/LED guidance.
+- Run human-in-the-loop procedures with probe/clickwheel step gating.
 
-## Getting connected
+Minimal patterns:
 
-The recommended way to talk to the Jumperless V5 from a host computer is via the helper script in `scripts/jumperless.py`. This script uses `pyserial` and the raw MicroPython REPL protocol so the agent can reliably send commands and read outputs.
+```python
+# Basic connection
+connect(1, D4)
+```
 
-### 1. Install dependencies
+```python
+# Basic measurement
+connect(ADC0, 5)
+print(adc_get(0))
+disconnect(ADC0, -1)
+```
 
-On the host machine:
+## Start Here (Progressive Disclosure)
+
+Read `reference/progressive-disclosure-map.md` first, choose one task lane, and load only those files.
+
+## Non-negotiable behavior
+
+- Treat this as an **active hardware tool**, not a passive advisor.
+- By default, perform routing/measurement actions directly on Jumperless using REPL commands.
+- Ask the user only for **physical actions** (place/move parts, press probe/clickwheel).
+- Before risky operations, snapshot with `get_state()` and restore when needed.
+- Never assume external wiring is known; verify with measurements.
+
+## Fast start (host)
 
 ```bash
 pip install pyserial
-```
-
-### 2. Detect the MicroPython REPL port
-
-To find and cache the correct USB serial port:
-
-```bash
 python scripts/jumperless.py detect
+python scripts/jumperless.py exec "print('ok from jumperless')"
 ```
 
-The script will:
-- Enumerate serial ports
-- Prefer ports whose name or VID/PID look like a Jumperless (`JLV5`, `Jumperless`, VID `1D50`, PID `ACAB`)
-- On macOS, prefer `/dev/cu.usbmodemJLV5port5` (the MicroPython REPL)
-- On Linux, prefer the third `/dev/ttyACM*` device (CDC index 2)
-- On Windows, prefer the COM port whose interface corresponds to CDC index 2 (MI_04)
-- If needed, probe candidate ports by sending raw REPL control characters and checking for a `>>> ` prompt
-- Cache the chosen port path in a `.jumperless_port` file for later use
+Prefer these execution modes:
+- Short command: `python scripts/jumperless.py exec "print(adc_get(0))"`
+- Multi-line script: `python scripts/jumperless.py exec --file scripts/run_test.py`
+- Piped script: `python scripts/jumperless.py exec --stdin < scripts/run_test.py`
 
-If detection fails, the script prints clear instructions and asks the user to choose a port; the agent should then use that port path for subsequent commands.
+Do **not** cram long multi-line logic into shell-quoted one-liners unless necessary.
 
-### 3. Run a one‑off MicroPython command
+## Guided step mode (single long script + button continue)
 
-You can execute a short MicroPython snippet on the Jumperless like this:
+Use built-in guided execution when the task is procedural:
 
 ```bash
-python scripts/jumperless.py exec "print('hello from jumperless')"
+python scripts/jumperless.py guide --file steps.txt
 ```
 
-The `exec` subcommand:
-- Uses the raw REPL protocol (`Ctrl-A` to enter, send code + `Ctrl-D` to run, read `OK`, capture stdout/stderr, `Ctrl-B` to exit)
-- Prints the captured stdout to the host terminal
-- Treats any stderr as an error the agent must handle and explain
+- `steps.txt` format: one non-empty line per step.
+- Device script prints each step, renders on OLED, then waits for continue:
+  - first choice: `probe_button(True)`
+  - fallback: `clickwheel_get_button()`
 
-For multi‑line scripts, the agent can either:
-- Pass a `"; "`‑joined string to `exec`, or
-- Ask the user to run `python scripts/jumperless.py exec -f my_script.py` if file‑based execution is supported by the helper script implementation.
+Use this for assembly/test checklists so the user advances each stage by pressing hardware controls.
 
-### 4. Get and set full board state
+## Workflow selection
 
-The most powerful interface to the Jumperless is the **state API**:
+Choose one workflow, run it, then return results:
 
-- `get_state()` → returns a JSON string describing:
-  - All rails, DACs, and their voltages
-  - Nets, bridges, and node memberships
-  - GPIO configuration and readings
-  - Active overlays and colors
-- `set_state(json_str, clear_first=True, from_wokwi=False)` → applies a complete state
+1. **Connectivity / rewiring task**
+   - Read: `reference/node-map.md`
+   - Then: `reference/api/connections-routing.md`
+2. **Measurement task**
+   - Read: `scripts/measurements.py`
+   - Then: `reference/api/measurements-power.md`
+3. **Visual guidance task**
+   - Read: `scripts/animations.py`
+   - Then: `reference/api/ui-interaction-system.md`
+4. **State surgery / large edits**
+   - Read: `reference/state-format.md`
+   - Then: `reference/api/state-nets-filesystem.md`
 
-Typical workflow:
+Only load `reference/api-reference.md` when a task spans multiple API domains.
+For transport/hanging execution issues, load `reference/repl-runtime-playbook.md`.
+
+## Core command patterns
 
 ```bash
-# From the host, ask the device for state
-python scripts/jumperless.py exec "import json; print(get_state())"
+# Snapshot state
+python scripts/jumperless.py state
+
+# Execute a robust multi-line script from file
+python scripts/jumperless.py exec --file scripts/session.py
+
+# List device filesystem
+python scripts/jumperless.py fs
 ```
 
-The agent should:
-1. Parse the returned JSON into a data structure
-2. Reason about connections, power rails, and GPIO states
-3. Propose modifications by editing the JSON
-4. Re‑serialize and apply with `set_state(...)`
+## Safety profiles
 
-Details of the JSON format are documented in `reference/state-format.md`.
+- **Beginner**: conservative changes, frequent explanation, auto-snapshot/restore.
+- **Advanced**: fewer prompts, allow temporary rail/DAC rewiring for tests.
+- **God mode**: broad autonomy, still announce assumptions before destructive changes.
 
-## Quick reference: core MicroPython APIs
+Default to **Beginner** unless user confidence and context indicate otherwise.
 
-These functions are **already available globally** in the MicroPython REPL; no import is needed.
+## Performance and context discipline
 
-- **Connections**
-  - `connect(node1, node2, duplicates=-1)` — create a bridge between two nodes
-  - `disconnect(node1, node2)` — remove a specific bridge (`node2=-1` clears all from `node1`)
-  - `fast_connect(node1, node2, duplicates=-1)` / `fast_disconnect(node1, node2)` — connect/disconnect without LED updates (faster sweeps)
-  - `is_connected(node1, node2)` — returns a truthy `ConnectionState` object if nodes share a net
-  - `nodes_clear()` — remove all bridges
+- Keep reasoning local to the active workflow.
+- Avoid loading all references; read only required files.
+- Prefer deterministic helper scripts over ad-hoc generated command strings.
+- Use concise execution scripts and return measured results, not long planning text.
 
-- **Power and DAC**
-  - `dac_set(channel, voltage)` — set DAC output or rail (channels 0–3 map to DAC0, DAC1, TOP_RAIL, BOTTOM_RAIL)
-  - `dac_get(channel)` — read back the configured voltage
+## File map
 
-- **ADC and current sensing**
-  - `adc_get(channel)` — measure voltage on ADC channel (0–3: ±8 V range, 4: 5 V‑limited, 7: probe)
-  - `ina_get_current(sensor)` — current in amps (sensor 0 for DAC0/probe, 1 for TOP_RAIL)
-  - `ina_get_bus_voltage(sensor)` — bus voltage in volts
-
-- **GPIO and PWM**
-  - `gpio_set(pin, value)` / `gpio_get(pin)` — drive or read GPIO_1–GPIO_8 or UART_TX/RX
-  - `gpio_set_dir(pin, direction)` — configure input/output
-  - `gpio_set_pull(pin, pull)` — configure pull‑up/down/none
-  - `pwm(pin, frequency=None, duty=None)` — configure PWM on a GPIO pin
-  - `pwm_set_duty_cycle(pin, duty)` / `pwm_set_frequency(pin, freq)` / `pwm_stop(pin)`
-
-- **State and nets**
-  - `get_state()` / `set_state(json_str, clear_first=True, from_wokwi=False)`
-  - `get_num_nets()` / `get_net_info(net_idx)` / `get_net_nodes(net_idx)`
-  - `get_num_paths(include_duplicates=False)` / `get_path_info(path_idx)` / `get_path_between(node1, node2)`
-
-- **LED overlays**
-  - `overlay_set(name, row, col, w, h, colors)` — define/update a named overlay
-  - `overlay_clear(name)` / `overlay_clear_all()` — remove one or all overlays
-  - `overlay_shift(name, dRow, dCol)` / `overlay_place(name, row, col)` — move an overlay
-  - `overlay_set_pixel(row, col, color)` — set one LED pixel
-  - `overlay_serialize()` — dump overlays as YAML
-
-For the full API, the agent should consult `reference/api-reference.md`.
-
-## Safety levels and risk management
-
-The hardware is robust and protected against many mistakes (for example, `connect(TOP_RAIL, GND)` is ignored), but the board cannot see user‑placed **external wires and components**. A wire between rows 5 and 10 plus `TOP_RAIL→5` and `GND→10` still creates a real short.
-
-The skill assumes three conceptual safety levels:
-
-- **Beginner** — default. Behaviors:
-  - Always take a `get_state()` snapshot before making structural changes
-  - Avoid changing rails or DACs unless explicitly requested
-  - Prefer `adc_get()` and INA measurements over aggressive rewiring
-  - Explain what each connection does in plain language
-
-- **Advanced** — user has some electronics experience. Behaviors:
-  - Save state, then freely modify connections and rails
-  - Use more complex measurement patterns (e.g. IV curves, resistance via DAC+INA)
-  - Still warn before large changes (like clearing all nodes)
-
-- **God mode** — user knows the risks and explicitly opts in. Behaviors:
-  - Agent can restructure large parts of the circuit
-  - Fewer confirmation prompts, but still documents assumptions
-
-The agent should infer an initial level from the user’s language and prior interactions (e.g. whether they mention specific IC part numbers, pin names, or datasheet parameters) and adjust explanations accordingly. When in doubt, default to **Beginner** and ask for permission before clearing nets or changing rails.
-
-## Measurement workflow (recommended pattern)
-
-When asked to “measure X between Y and Z”, follow this pattern:
-
-1. **Clarify the goal**
-   - What quantity is being measured? (voltage, current, resistance, frequency)
-   - What components are present and where are they on the breadboard?
-
-2. **Capture current state**
-   - Call `get_state()` and store the JSON string (either in a variable on device or in the host environment).
-
-3. **Prepare connections**
-   - For **voltage**: 
-     - Connect the target node to an ADC channel (e.g. `connect(ADC0, 5)`), read with `adc_get(0)`, then `disconnect(ADC0, -1)` if it’s a temporary probe.
-   - For **current**:
-     - Insert the ISENSE shunt in series: `connect(ISENSE_PLUS, node_high)`, `connect(ISENSE_MINUS, node_low)`.
-     - Read with `ina_get_current(0)` or `ina_get_current(1)` depending on which shunt is used.
-   - For **resistance**:
-     - Use DAC + INA: drive a known voltage across the unknown element, measure current, then compute `R = V / I`.
-
-4. **Apply settings**
-   - Set DAC or rail voltages using `dac_set(...)`.
-   - Configure GPIOs or PWM if the circuit under test involves them.
-
-5. **Measure and interpret**
-   - Take multiple samples if noise is expected.
-   - Compare the result against expected ranges from the component’s datasheet.
-   - If a result is clearly wrong, inspect `get_state()`, `print_nets()`, or `get_net_info()` for wiring discrepancies.
-
-6. **Restore or keep changes**
-   - For temporary experiments, restore the saved JSON via `set_state(saved_json)`.
-   - For permanent designs, either leave the new state in place or save it to a slot for later use.
-
-Examples of these workflows are provided in `examples/measure-resistance.md` and `examples/circuit-debugging.md`.
-
-## LED overlay system basics
-
-The breadboard LEDs form a **5×60 grid** of addressable RGB pixels (with a 2‑hole gap between the two halves, like a normal breadboard):
-- Rows 1–5: top half (above the center gap)
-- Rows 6–10: bottom half (below the gap)
-- Columns 1–30: along the length of the breadboard
-
-Overlays are drawn **on top of** any wires or nets the firmware is already rendering. A color value of `0x000000` in an overlay means “transparent” (do not override the underlying visualization).
-
-**Brightness rules:**
-- LEDs are very bright. Avoid `0xFFFFFF`.
-- Prefer saturated colors at reduced brightness:
-  - Good examples: `0x2020FF`, `0x20FF20`, `0xFF2020`, `0x20FFFF`
-  - For white, cap around `0x404040`
-- When designing animations, favor **subtle pulsing or motion** over high brightness.
-
-The `scripts/animations.py` library (uploaded to the device) provides reusable overlay patterns like:
-- Row highlights
-- Arrows between two rows
-- “Place component here” indicators
-
-The agent should use these helpers whenever possible instead of hand‑crafting color arrays, unless a highly custom effect is needed.
-
-## Key gotchas to remember
-
-- **Crossbar resistance**:
-  - Each path through the CH446Q crossbar adds ~80 Ω of resistance.
-  - The firmware automatically stacks parallel paths (per `[routing]` config), so effective resistance can drop to ~20 Ω on heavily used nets.
-  - This means measured voltages under load will sag compared to ideal calculations; the agent should factor that into expectations.
-
-- **ISENSE+ and ISENSE‑ are shorted internally**:
-  - They are the two ends of a **2 Ω shunt resistor**.
-  - They must be placed **in series** with the circuit being measured, not across a supply.
-  - The board cannot tell when the user has miswired them off‑board; always cross‑check against the user’s description.
-
-- **External wires and components are invisible**:
-  - `get_state()` and the net/path APIs describe only **virtual** connections inside the crossbar.
-  - Any actual wires, resistors, ICs, or modules on the breadboard are not represented unless the user explains them.
-  - The agent must maintain a mental model of the user’s physical layout and combine that with the internal state to reason correctly.
-
-- **Context modes**:
-  - `context_get()` returns `\"global\"` or `\"python\"`.
-  - In `python` context, connections made during a MicroPython session are rolled back when Python exits.
-  - In `global` context, connections persist across sessions.
-  - The agent should explicitly decide which mode to use and document the choice.
-
-## Where to find more detail
-
-- **Full API reference**: `reference/api-reference.md`
-- **Node numbering and aliases**: `reference/node-map.md`
-- **Hardware behavior and limits**: `reference/hardware-guide.md`
-- **State JSON format**: `reference/state-format.md`
-- **Design goals and future extensions**: `reference/vision.md`
-- **Host‑side helper and usage**: `scripts/jumperless.py`
-- **Device‑side helpers**:
-  - Measurements: `scripts/measurements.py`
-  - LED animations: `scripts/animations.py`
-- **Worked examples**:
-  - `examples/measure-resistance.md`
-  - `examples/circuit-debugging.md`
-  - `examples/led-animations.md`
-
-The agent should treat this skill as the authoritative source for Jumperless‑specific behavior and use the external Jumperless docs (`https://docs.jumperless.org/`) for additional context when necessary.
+- Host transport and REPL runner: `scripts/jumperless.py`
+- Measurement helpers: `scripts/measurements.py`
+- LED/OLED animation helpers: `scripts/animations.py`
+- Progressive routing map: `reference/progressive-disclosure-map.md`
+- REPL/runtime playbook: `reference/repl-runtime-playbook.md`
+- Full deep guide (extension/migration): `reference/deep-dive/full-skill-guide.md`
+- API split: `reference/api/connections-routing.md`
+- API split: `reference/api/measurements-power.md`
+- API split: `reference/api/state-nets-filesystem.md`
+- API split: `reference/api/ui-interaction-system.md`
+- API monolith (legacy fallback): `reference/api-reference.md`
+- Node IDs/aliases: `reference/node-map.md`
+- Hardware behavior: `reference/hardware-guide.md`
+- State JSON schema: `reference/state-format.md`
+- Design context/roadmap: `reference/vision.md`
 

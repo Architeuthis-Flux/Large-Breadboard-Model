@@ -4,6 +4,15 @@ This file summarizes the **MicroPython API** exposed by the `jumperless` module 
 
 For full prose descriptions and examples, see the official docs at `https://docs.jumperless.org/09.5-micropythonAPIreference/`. This file is optimized for agents and quick lookup.
 
+For progressive disclosure, prefer the split API files first:
+
+- `reference/api/connections-routing.md`
+- `reference/api/measurements-power.md`
+- `reference/api/state-nets-filesystem.md`
+- `reference/api/ui-interaction-system.md`
+
+Use this monolithic file only when a task spans multiple API domains.
+
 ---
 
 ## Node addressing

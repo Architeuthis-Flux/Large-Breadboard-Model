@@ -29,8 +29,8 @@ connect(35, GND) # connect lower half row 35 to ground
 | Name                | Aliases                              | ID  | Notes                                   |
 |---------------------|--------------------------------------|-----|-----------------------------------------|
 | `GND`               | `GROUND`                             | 100 | Global ground net                       |
-| `TOP_RAIL`          | `TOPRAIL`, `T_R`, `TOP_R`           | 101 | Adjustable top rail                     |
-| `BOTTOM_RAIL`       | `BOTTOMRAIL`, `BOT_RAIL`, `B_R`    | 102 | Adjustable bottom rail                  |
+| `TOP_RAIL`          | `T_R`, `TOP_R`                       | 101 | Adjustable top rail                     |
+| `BOTTOM_RAIL`       | `BOT_RAIL`, `B_R`                    | 102 | Adjustable bottom rail                  |
 | `SUPPLY_3V3`        | `3V3`, `3.3V`                        | 103 | Internal 3.3 V supply                   |
 | `TOP_RAIL_GND`      | `TOP_GND`                            | 104 | Top rail ground segment                 |
 | `SUPPLY_5V`         | `5V`, `+5V`                          | 105 | Internal 5 V supply                     |
@@ -47,8 +47,8 @@ connect(35, GND) # connect lower half row 35 to ground
 
 | Name     | Aliases          | ID  | Notes                  |
 |----------|------------------|-----|------------------------|
-| `DAC0`   | `DAC_0`, `DAC0_5V` | 106 | DAC channel 0          |
-| `DAC1`   | `DAC_1`, `DAC1_8V` | 107 | DAC channel 1          |
+| `DAC0`   | `DAC_0`          | 106 | DAC channel 0          |
+| `DAC1`   | `DAC_1`,         | 107 | DAC channel 1          |
 
 ### Current sense
 
@@ -76,8 +76,8 @@ These two nodes are the ends of a **2 Ω shunt resistor** and are internally sho
 
 | Name         | Aliases        | ID  | Notes                         |
 |--------------|----------------|-----|-------------------------------|
-| `RP_UART_TX` | `UART_TX`, `TX`, `RP_GPIO_16` | 116 | Routable UART TX / GPIO 16   |
-| `RP_UART_RX` | `UART_RX`, `RX`, `RP_GPIO_17` | 117 | Routable UART RX / GPIO 17   |
+| `RP_UART_TX` | `UART_TX`, `TX`| 116 | Routable UART TX / GPIO 16   |
+| `RP_UART_RX` | `UART_RX`, `RX`| 117 | Routable UART RX / GPIO 17   |
 | `RP_GPIO_18` | `GP_18`        | 118 | Internal GPIO 18              |
 | `RP_GPIO_19` | `GP_19`        | 119 | Internal GPIO 19              |
 
@@ -162,9 +162,9 @@ Special nodes representing where the probe can tap the rails:
 | Name             | Aliases                  | ID  |
 |------------------|--------------------------|-----|
 | `TOP_RAIL`       | `TOP_RAIL_PAD`          | 101 |
-| `BOTTOM_RAIL`    | `BOTTOM_RAIL_PAD`, `BOT_RAIL_PAD` | 102 |
+| `BOTTOM_RAIL`    | `BOTTOM_RAIL_PAD`       | 102 |
 | `TOP_RAIL_GND`   | `TOP_GND_PAD`           | 104 |
-| `BOTTOM_RAIL_GND`| `BOT_RAIL_GND`, `BOTTOM_GND_PAD`, `BOT_GND_PAD` | 126 |
+| `BOTTOM_RAIL_GND`| `BOT_RAIL_GND`, `BOTTOM_GND_PAD` | 126 |
 
 ---
 
