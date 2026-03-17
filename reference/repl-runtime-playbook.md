@@ -36,6 +36,24 @@ python scripts/jumperless.py guide --file tests/steps_555.txt
   - `probe_button(True)` first
   - `clickwheel_get_button()` fallback
 
+## Updating a Running Loop Script
+
+Loop scripts run on the **device** in MicroPython. The host `exec` process exits after sending the script — the serial port is free. The MicroPython loop keeps running on the Jumperless itself.
+
+### Procedure
+
+1. **Edit the script file** on the host with the desired changes.
+2. **Run `exec` with the updated file.** `enter_raw_repl()` sends `\x03\x03` (double Ctrl-C) to interrupt whatever is running on the device before sending new code. No process killing needed.
+3. **Start the new script with a cleanup header** so any state left by the interrupted script is cleared:
+
+```python
+import time
+nodes_clear()
+overlay_clear_all()
+oled_clear()
+time.sleep(0.05)
+```
+
 ## Failure Recovery
 
 ### Timeout in `exec`

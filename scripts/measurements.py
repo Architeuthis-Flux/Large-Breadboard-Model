@@ -13,7 +13,12 @@ globally (connect, disconnect, dac_set, adc_get, ina_get_current, etc.).
 try:
     import math
 except ImportError:
-    math = None  # math is optional; some helpers degrade gracefully
+    math = None
+
+try:
+    import time
+except ImportError:
+    time = None
 
 
 def _safe_disconnect(node):
@@ -22,6 +27,18 @@ def _safe_disconnect(node):
         disconnect(node, -1)
     except Exception:
         pass
+
+
+def _settle(seconds=0.01):
+    """Wait for crossbar/DAC to settle after routing or voltage changes."""
+    if time is not None:
+        time.sleep(seconds)
+
+
+def _inter_sample_delay():
+    """Small delay between repeated ADC/INA samples."""
+    if time is not None:
+        time.sleep(0.01)
 
 
 def measure_voltage(node, adc_channel=0, disconnect_after=True):
@@ -50,6 +67,8 @@ def measure_voltage(node, adc_channel=0, disconnect_after=True):
     except Exception as e:
         print("measure_voltage: could not connect ADC:", e)
         return None
+
+    _settle(0.01)
 
     try:
         v = adc_get(adc_channel)
@@ -86,6 +105,8 @@ def measure_current_series(high_node, low_node, sensor=0, disconnect_after=True)
     except Exception as e:
         print("measure_current_series: connect failed:", e)
         return None, None
+
+    _settle(0.01)
 
     try:
         i = ina_get_current(sensor)
@@ -144,6 +165,8 @@ def measure_resistance(node_a, node_b, dac_channel=1, sensor=0, set_voltage=3.0,
     except Exception as e:
         print("measure_resistance: connect failed:", e)
         return None
+
+    _settle(0.01)
 
     try:
         v_bus = ina_get_bus_voltage(sensor)
@@ -205,6 +228,8 @@ def sweep_voltage(node, start_v, end_v, steps, dac_channel=1, adc_channel=0, dis
         print("sweep_voltage: connect failed:", e)
         return results
 
+    _settle(0.01)
+
     try:
         for i in range(steps):
             if steps == 1:
@@ -217,12 +242,7 @@ def sweep_voltage(node, start_v, end_v, steps, dac_channel=1, adc_channel=0, dis
             except Exception as e:
                 print("sweep_voltage: dac_set failed:", e)
                 break
-            # Small delay to let things settle
-            try:
-                import time as _time
-                _time.sleep(0.02)
-            except Exception:
-                pass
+            _settle(0.01)
             try:
                 v_meas = adc_get(adc_channel)
             except Exception as e:
