@@ -22,7 +22,10 @@ connect(1, 10)   # connect top row 1 to top row 10
 connect(35, GND) # connect lower half row 35 to ground
 ```
 
+
 ---
+
+## DACs and ADCs
 
 ## Special nodes and supplies
 
@@ -31,24 +34,11 @@ connect(35, GND) # connect lower half row 35 to ground
 | `GND`               | `GROUND`                             | 100 | Global ground net                       |
 | `TOP_RAIL`          | `T_R`, `TOP_R`                       | 101 | Adjustable top rail                     |
 | `BOTTOM_RAIL`       | `BOT_RAIL`, `B_R`                    | 102 | Adjustable bottom rail                  |
-| `SUPPLY_3V3`        | `3V3`, `3.3V`                        | 103 | Internal 3.3 V supply                   |
-| `TOP_RAIL_GND`      | `TOP_GND`                            | 104 | Top rail ground segment                 |
-| `SUPPLY_5V`         | `5V`, `+5V`                          | 105 | Internal 5 V supply                     |
-| `SUPPLY_8V_P`       | `8V_P`, `8V_POS`                     | 120 | +8 V rail                               |
-| `SUPPLY_8V_N`       | `8V_N`, `8V_NEG`                     | 121 | −8 V rail                               |
-| `BOTTOM_RAIL_GND`   | `BOT_GND`, `BOTTOM_GND`              | 126 | Bottom rail ground segment              |
-| `EMPTY_NET`         | `EMPTY`                              | 127 | Special “empty” net marker              |
-
----
-
-## DACs and ADCs
-
-### DAC nodes
-
-| Name     | Aliases          | ID  | Notes                  |
-|----------|------------------|-----|------------------------|
-| `DAC0`   | `DAC_0`          | 106 | DAC channel 0          |
-| `DAC1`   | `DAC_1`,         | 107 | DAC channel 1          |
+| `DAC0`              | `DAC_0`          | 106 | DAC channel 0 `*`        |
+| `DAC1`              | `DAC_1`          | 107 | DAC channel 1          |
+ 
+> [!CAUTION] 
+> `*` Avoid using **DAC 0** and **ROUTABLE_BUFFER_IN** because they're used for probe switch sensing
 
 ### Current sense
 
@@ -76,10 +66,8 @@ These two nodes are the ends of a **2 Ω shunt resistor** and are internally sho
 
 | Name         | Aliases        | ID  | Notes                         |
 |--------------|----------------|-----|-------------------------------|
-| `RP_UART_TX` | `UART_TX`, `TX`| 116 | Routable UART TX / GPIO 16   |
-| `RP_UART_RX` | `UART_RX`, `RX`| 117 | Routable UART RX / GPIO 17   |
-| `RP_GPIO_18` | `GP_18`        | 118 | Internal GPIO 18              |
-| `RP_GPIO_19` | `GP_19`        | 119 | Internal GPIO 19              |
+
+
 
 ---
 
@@ -87,16 +75,18 @@ These two nodes are the ends of a **2 Ω shunt resistor** and are internally sho
 
 These are the main user‑accessible GPIOs.
 
-| Name         | Aliases                    | ID  |
-|--------------|----------------------------|-----|
-| `RP_GPIO_1`  | `GPIO_1`, `GPIO1`, `GP_1`, `GP1` | 131 |
-| `RP_GPIO_2`  | `GPIO_2`, `GPIO2`, `GP_2`, `GP2` | 132 |
-| `RP_GPIO_3`  | `GPIO_3`, `GPIO3`, `GP_3`, `GP3` | 133 |
-| `RP_GPIO_4`  | `GPIO_4`, `GPIO4`, `GP_4`, `GP4` | 134 |
-| `RP_GPIO_5`  | `GPIO_5`, `GPIO5`, `GP_5`, `GP5` | 135 |
-| `RP_GPIO_6`  | `GPIO_6`, `GPIO6`, `GP_6`, `GP6` | 136 |
-| `RP_GPIO_7`  | `GPIO_7`, `GPIO7`, `GP_7`, `GP7` | 137 |
-| `RP_GPIO_8`  | `GPIO_8`, `GPIO8`, `GP_8`, `GP8` | 138 |
+| Name         | Aliases                          | ID  | RP2350B Pin | Notes |
+|--------------|----------------------------------|-----|------------|-------------------|
+| `RP_GPIO_1`  | `GPIO_1`, `GPIO1`, `GP_1`, `GP1` | 131 | 20         | I'm sorry they're 1-indexed like this
+| `RP_GPIO_2`  | `GPIO_2`, `GPIO2`, `GP_2`, `GP2` | 132 | 21         |
+| `RP_GPIO_3`  | `GPIO_3`, `GPIO3`, `GP_3`, `GP3` | 133 | 22         |
+| `RP_GPIO_4`  | `GPIO_4`, `GPIO4`, `GP_4`, `GP4` | 134 | 23         |
+| `RP_GPIO_5`  | `GPIO_5`, `GPIO5`, `GP_5`, `GP5` | 135 | 24         |
+| `RP_GPIO_6`  | `GPIO_6`, `GPIO6`, `GP_6`, `GP6` | 136 | 25         |
+| `RP_GPIO_7`  | `GPIO_7`, `GPIO7`, `GP_7`, `GP7` | 137 | 25         |
+| `RP_GPIO_8`  | `GPIO_8`, `GPIO8`, `GP_8`, `GP8` | 138 | 27         |
+| `RP_UART_TX` | `UART_TX`, `TX`                  | 116 | 0          | 2nd serial port passthrough
+| `RP_UART_RX` | `UART_RX`, `RX`                  | 117 | 1          |
 
 When working at the MicroPython level you will usually use `GPIO_1`–`GPIO_8` and the higher‑level GPIO APIs.
 
@@ -111,45 +101,45 @@ These correspond to a routable buffer block:
 | `ROUTABLE_BUFFER_IN`  | `BUFFER_IN`, `BUF_IN`, `BUFF_IN`, `BUFFIN` | 139 |
 | `ROUTABLE_BUFFER_OUT` | `BUFFER_OUT`, `BUF_OUT`, `BUFF_OUT`, `BUFFOUT` | 140 |
 
+> [!CAUTION] 
+> `*` Avoid using **DAC 0** and **ROUTABLE_BUFFER_IN** because they're used for probe switch sensing
 ---
 
 ## Arduino Nano header
 
 The Nano header pins are mapped as follows:
 
-| Name          | Aliases  | ID  |
-|---------------|----------|-----|
-| `NANO_VIN`    | `VIN`    | 69  |
-| `NANO_D0`     | `D0`     | 70  |
-| `NANO_D1`     | `D1`     | 71  |
-| `NANO_D2`     | `D2`     | 72  |
-| `NANO_D3`     | `D3`     | 73  |
-| `NANO_D4`     | `D4`     | 74  |
-| `NANO_D5`     | `D5`     | 75  |
-| `NANO_D6`     | `D6`     | 76  |
-| `NANO_D7`     | `D7`     | 77  |
-| `NANO_D8`     | `D8`     | 78  |
-| `NANO_D9`     | `D9`     | 79  |
-| `NANO_D10`    | `D10`    | 80  |
-| `NANO_D11`    | `D11`    | 81  |
-| `NANO_D12`    | `D12`    | 82  |
-| `NANO_D13`    | `D13`    | 83  |
-| `NANO_RESET`  | `RESET`  | 84  |
-| `NANO_AREF`   | `AREF`   | 85  |
-| `NANO_A0`     | `A0`     | 86  |
-| `NANO_A1`     | `A1`     | 87  |
-| `NANO_A2`     | `A2`     | 88  |
-| `NANO_A3`     | `A3`     | 89  |
-| `NANO_A4`     | `A4`     | 90  |
-| `NANO_A5`     | `A5`     | 91  |
-| `NANO_A6`     | `A6`     | 92  |
-| `NANO_A7`     | `A7`     | 93  |
-| `NANO_RESET_0`| `RST0`   | 94  |
-| `NANO_RESET_1`| `RST1`   | 95  |
-| `NANO_GND_1`  | `N_GND1` | 96  |
-| `NANO_GND_0`  | `N_GND0` | 97  |
-| `NANO_3V3`    |          | 98  |
-| `NANO_5V`     |          | 99  |
+| Name          | Aliases  | ID  | Routable? | Notes |
+|---------------|----------|-----|-----------|-------|
+| `NANO_VIN`    | `VIN`    | 69  |N
+| `NANO_D0`     | `D0`     | 70  |Y
+| `NANO_D1`     | `D1`     | 71  |Y
+| `NANO_D2`     | `D2`     | 72  |Y
+| `NANO_D3`     | `D3`     | 73  |Y
+| `NANO_D4`     | `D4`     | 74  |Y
+| `NANO_D5`     | `D5`     | 75  |Y
+| `NANO_D6`     | `D6`     | 76  |Y
+| `NANO_D7`     | `D7`     | 77  |Y
+| `NANO_D9`     | `D9`     | 79  |Y
+| `NANO_D10`    | `D10`    | 80  |Y
+| `NANO_D11`    | `D11`    | 81  |Y
+| `NANO_D12`    | `D12`    | 82  |Y
+| `NANO_D13`    | `D13`    | 83  |Y
+| `NANO_AREF`   | `AREF`   | 85  |Y
+| `NANO_A0`     | `A0`     | 86  |Y
+| `NANO_A1`     | `A1`     | 87  |Y
+| `NANO_A2`     | `A2`     | 88  |Y
+| `NANO_A3`     | `A3`     | 89  |Y
+| `NANO_A4`     | `A4`     | 90  |Y
+| `NANO_A5`     | `A5`     | 91  |Y
+| `NANO_A6`     | `A6`     | 92  |Y
+| `NANO_A7`     | `A7`     | 93  |Y
+| `NANO_RESET_0`| `RST0`   | 94  |N|Wired directly to RP2350B pin 18
+| `NANO_RESET_1`| `RST1`   | 95  |N|PSRAM Mod kits use this as CS (pin 19)
+| `NANO_GND_1`  | `N_GND1` | 96  |N
+| `NANO_GND_0`  | `N_GND0` | 97  |N
+| `NANO_3V3`    |          | 98  |N
+| `NANO_5V`     |          | 99  |N
 
 These nodes let you route signals between the RP2350, the breadboard, and any compatible Nano‑footprint dev board (classic Nano, Nano ESP32, Nano RP2040 Connect, etc.).
 
@@ -174,8 +164,8 @@ The board follows a standard half‑size breadboard geometry:
 
 - Nano header at the top:
 
-  - Top row: `D12 D11 D10 D9 D8 D7 D6 D5 D4 D3 D2 GND RST D0 D1`
-  - Second row: `D13 3V3 REF A0 A1 A2 A3 A4 A5 A6 A7 5V RST GND VIN`
+  - Top row: `D12 D11 D10 D9 D8 D7 D6 D5 D4 D3 D2 GND RST1 D0 D1`
+  - Second row: `D13 3V3 REF A0 A1 A2 A3 A4 A5 A6 A7 5V RST0 GND VIN`
 
 - Power rails:
 
@@ -188,6 +178,27 @@ The board follows a standard half‑size breadboard geometry:
   - Rows `31`–`60` — lower half, between the center gap and the bottom rails
 
 An ASCII diagram (from the docs) approximates the layout; the agent should treat rows and rails as in any typical solderless breadboard, with the addition that every hole has an individually controllable RGB LED.
+
+### DIP ICs straddling the center gap
+
+A DIP chip (555, op-amp, logic, …) sits across the center gap, with each side in
+a different breadboard half. The two halves are independent rows, so the two
+sides of the chip map to numerically distant nodes. For a chip whose first pin
+sits at upper-half row `N`, the upper-side pins run `N, N+1, …` and the
+lower-side pins run from the row directly across the gap (`N+30`).
+
+Worked example — an 8-pin DIP (e.g. a 555) with pin 1 at row 1:
+
+| Pin | Node | Pin | Node |
+|-----|------|-----|------|
+| 1 | `1` | 8 | `31` |
+| 2 | `2` | 7 | `32` |
+| 3 | `3` | 6 | `33` |
+| 4 | `4` | 5 | `34` |
+
+Pins 1–4 are on the upper side (rows 1–4); pins 5–8 are across the gap on the
+lower side (rows 34→31, counting back toward pin 1). Adjust the base row to wherever
+the chip is actually placed; verify with the probe or a measurement when unsure.
 
 ---
 

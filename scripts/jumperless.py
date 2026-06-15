@@ -11,6 +11,7 @@ This script is designed to be called by an agent via shell.
 
 import argparse
 import os
+import re
 import sys
 import time
 from typing import Iterable, List, Optional, Tuple
@@ -64,6 +65,47 @@ def preferred_order_key(port: serial.tools.list_ports_common.ListPortInfo) -> Tu
         return (2, name)
     # everything else last
     return (3, name)
+
+
+# Role of each Jumperless CDC interface, in USB-interface order. macOS exposes
+# them as JLV5port{1,3,5,7}; Linux/Windows expose 4 sequential CDC interfaces.
+CDC_ROLES = ["main", "passthrough", "repl", "ser3"]
+# macOS JLV5portN suffix -> role (N is 1,3,5,7 for the 4 CDC functions).
+MACOS_PORT_ROLE = {"1": "main", "3": "passthrough", "5": "repl", "7": "ser3"}
+
+
+def enumerate_roles() -> List[Tuple[str, str]]:
+    """Label every Jumperless CDC interface with its role.
+
+    Absorbs the standalone port_identify.py: returns [(device, role), ...] where
+    role is one of main / passthrough / repl / ser3 (or "?" if undetermined).
+    macOS names carry the role in the JLV5portN suffix; on Linux/Windows the
+    four Jumperless CDC interfaces are assigned by their enumeration order.
+    """
+    jl_ports = [p for p in list_ports.comports() if looks_like_jumperless(p)]
+
+    # macOS: the JLV5portN suffix is authoritative.
+    macos = []
+    for p in jl_ports:
+        name = p.device or ""
+        m = re.search(r"JLV5port(\d+)", name, re.IGNORECASE)
+        if m:
+            macos.append((p, m.group(1)))
+    if macos and len(macos) == len(jl_ports):
+        out = []
+        for p, n in sorted(macos, key=lambda t: int(t[1])):
+            out.append((p.device, MACOS_PORT_ROLE.get(n, "?")))
+        return out
+
+    # Linux/Windows: assign by enumeration order (CDC interface index).
+    def order_key(p):
+        m = re.search(r"(\d+)$", p.device or "")
+        return int(m.group(1)) if m else 0
+
+    out = []
+    for i, p in enumerate(sorted(jl_ports, key=order_key)):
+        out.append((p.device, CDC_ROLES[i] if i < len(CDC_ROLES) else "?"))
+    return out
 
 
 def raw_repl_probe(port_path: str, timeout: float = 2.0) -> bool:
@@ -340,6 +382,13 @@ def _build_guide_script(steps: List[str], oled: bool = True) -> str:
 
 
 def cmd_detect(args: argparse.Namespace) -> None:
+    if getattr(args, "roles", False):
+        roles = enumerate_roles()
+        if not roles:
+            raise SystemExit("No Jumperless CDC interfaces found. Connect the board and try again.")
+        for device, role in roles:
+            print(f"{role}\t{device}")
+        return
     port = detect_port(explicit=args.port)
     print(port)
 
@@ -447,6 +496,9 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_detect = sub.add_parser("detect", help="Detect and print the Jumperless MicroPython REPL port")
+    p_detect.add_argument("--roles", action="store_true",
+                          help="List every Jumperless CDC interface labeled by role "
+                               "(main / passthrough / repl / ser3) instead of just the REPL port")
     p_detect.set_defaults(func=cmd_detect)
 
     p_exec = sub.add_parser("exec", help="Execute MicroPython via raw REPL")

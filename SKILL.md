@@ -13,11 +13,33 @@ description: >-
 
 This skill controls real Jumperless V5 hardware via MicroPython REPL.
 
-**Working directory for all commands:**
+**Working directory:** the skill root (this repo). All commands below are
+repo-relative — run them from wherever this skill is installed (e.g.
+`~/.cursor/skills/jumperless-v5` or `~/.claude/skills/jumperless-v5`). Do not
+hardcode an absolute checkout path.
 
-```
-/Users/kevinsanto/Documents/GitHub/Large Breadboard Model
-```
+## Communication methods
+
+The Jumperless exposes four USB CDC serial interfaces. This skill drives the
+**MicroPython Raw REPL** (port 5) via `scripts/jumperless.py`, which is the
+primary transport for everything below.
+
+| Port | macOS suffix | Role |
+|------|--------------|------|
+| 1 | `JLV5port1` | Main terminal, menu, `>` one-liner Python |
+| 3 | `JLV5port3` | Arduino UART passthrough |
+| 5 | `JLV5port5` | MicroPython Raw REPL — **what this skill uses** |
+| 7 | `JLV5port7` | USBSer3 read-only machine backchannel (`:help` YAML, `:gpio`, `:leds`, `:adc`, …) |
+
+- **REPL (port 5) is primary** — `jumperless.py detect/exec/state/fs/guide`.
+- **Port 7 (USBSer3)** is an optional fast, read-only telemetry channel: send
+  `:help` for a self-describing YAML index of its verbs, or `:gpio`, `:leds`,
+  `:slot`, `:adc` for instant non-blocking snapshots. It never mutates state —
+  defer any state changes to the REPL (or the MCP server).
+- **MCP alternative:** for MCP-native clients, build the server from the `mcp/`
+  submodule (see "MCP alternative" below). Do not run the MCP server and
+  `jumperless.py` against the same board simultaneously — they both want the
+  USB port exclusively.
 
 ## Non-negotiable behavior
 
@@ -364,9 +386,32 @@ When measurements don't match expectations:
 - Return measured results concisely — the user cares about values and conclusions, not pages of planning text.
 - For long-running scripts (continuous monitors, guided flows), use `--timeout` appropriately and `block_until_ms: 0` to background them.
 
+## MCP alternative
+
+If you are on an MCP-native client (Claude Desktop, Cursor MCP, …), you can use
+the **jumperless-mcp** server instead of this skill's shell transport. It lives
+as the `mcp/` git submodule in this repo:
+
+```bash
+git submodule update --init --recursive    # if not cloned with --recurse-submodules
+cd mcp && cargo install --path .            # or use a release binary
+```
+
+Point your MCP client at the built `jumperless-mcp` binary. See `mcp/README.md`
+for tool list and lifecycle. **The MCP server holds the USB port exclusively
+while running** — don't run `jumperless.py` against the same board at the same
+time.
+
+## Canonical API reference
+
+`reference/api-reference.md` (and the `reference/api/` split) is a convenience
+copy that can drift. When precise call signatures matter, treat the docs site
+as canonical: <https://docs.jumperless.org/09.5-micropythonAPIreference/>.
+
 ## File map
 
 - Host transport and REPL runner: `scripts/jumperless.py`
+- MCP server (submodule): `mcp/` — see `mcp/README.md`
 - Measurement helpers (device-side): `scripts/measurements.py`
 - Resistance measurement scratch: `measureR.py`
 - LED/OLED animation helpers: `scripts/animations.py`

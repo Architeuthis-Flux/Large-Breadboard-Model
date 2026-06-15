@@ -2,6 +2,11 @@
 
 The function `get_state()` returns a **JSON string** describing the entire board state: power rails, nets, GPIOs, and overlays. `set_state(json_str, clear_first=True, from_wokwi=False)` applies such a state.
 
+
+> [!NOTE]
+> The entire immediate state of the board is defined in this JSON (or YAML) slot file and can be shared to another Jumperless, saved as a backups, included in tutorials, etc. 
+
+
 This file explains the structure so agents can safely inspect, modify, and re‑apply state.
 
 ---
